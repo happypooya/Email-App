@@ -40,7 +40,7 @@
   </script>
 
   <style>
-    /* Smooth custom scrollbars */
+    /* Smooth custom scrollbars & mobile touch scrolling */
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
@@ -54,6 +54,10 @@
     }
     ::-webkit-scrollbar-thumb:hover {
       background: rgba(71, 85, 105, 1);
+    }
+
+    .overflow-y-auto {
+      -webkit-overflow-scrolling: touch;
     }
 
     /* Glassmorphism effects */
@@ -89,11 +93,16 @@
     }
   </style>
 </head>
-<body class="h-full text-slate-100 font-sans antialiased bg-slate-950 selection:bg-brand-500 selection:text-white flex flex-col">
+<body class="h-full text-slate-100 font-sans antialiased bg-slate-950 selection:bg-brand-500 selection:text-white flex flex-col overflow-hidden">
 
   <!-- Global Top Header Bar -->
   <header class="h-14 border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md flex items-center justify-between px-4 sm:px-6 shrink-0 z-30">
     <div class="flex items-center space-x-3">
+      <!-- Mobile Sidebar Navigation Toggle Button -->
+      <button id="mobile-menu-btn" onclick="toggleMobileSidebar()" class="hidden text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 border border-transparent hover:border-slate-700" title="Toggle Navigation Sidebar">
+        <i class="fa-solid fa-bars text-base"></i>
+      </button>
+
       <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-brand-500/20">
         <i class="fa-solid me-0.5 fa-shield-halved text-white text-sm"></i>
       </div>
@@ -220,7 +229,7 @@
   <div id="inbox-screen" class="hidden flex-1 flex flex-col md:flex-row overflow-hidden relative">
     
     <!-- Sidebar Navigation -->
-    <aside class="w-full md:w-64 bg-slate-900/95 border-r border-slate-800 flex flex-col shrink-0">
+    <aside id="inbox-sidebar" class="w-full md:w-64 bg-slate-900/95 border-r border-slate-800 flex flex-col shrink-0 hidden md:flex z-20">
       
       <!-- Compose Button & Search -->
       <div class="p-4 border-b border-slate-800 space-y-3">
@@ -237,12 +246,12 @@
 
       <!-- Navigation Links -->
       <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
-        <a href="#" onclick="filterCategory('inbox')" class="flex items-center justify-between px-3 py-2 rounded-lg bg-brand-500/10 text-brand-400 font-medium text-xs border border-brand-500/20">
+        <a href="#" onclick="showMobileList()" class="flex items-center justify-between px-3 py-2 rounded-lg bg-brand-500/10 text-brand-400 font-medium text-xs border border-brand-500/20">
           <div class="flex items-center space-x-2.5">
             <i class="fa-solid fa-inbox text-sm"></i>
             <span>Inbox</span>
           </div>
-          <span class="px-2 py-0.5 text-[10px] bg-brand-500/20 text-brand-300 rounded-full font-mono font-bold" id="unread-count">5</span>
+          <span class="px-2 py-0.5 text-[10px] bg-brand-500/20 text-brand-300 rounded-full font-mono font-bold" id="unread-count">6</span>
         </a>
 
         <a href="#" class="flex items-center justify-between px-3 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors text-xs">
@@ -296,13 +305,13 @@
     </aside>
 
     <!-- Email List Column -->
-    <div class="w-full md:w-80 lg:w-96 border-r border-slate-800 bg-slate-950/80 flex flex-col shrink-0">
+    <div id="email-list-col" class="w-full md:w-80 lg:w-96 border-r border-slate-800 bg-slate-950/80 flex flex-col shrink-0 min-h-0 h-full">
       
       <!-- List Header -->
-      <div class="p-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/40">
+      <div class="p-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/40 shrink-0">
         <div class="flex items-center space-x-2">
           <span class="text-xs font-bold text-slate-200 uppercase tracking-wider">Vault Inbox</span>
-          <span class="px-2 py-0.5 text-[10px] bg-slate-800 text-slate-300 rounded-full border border-slate-700">5 Messages</span>
+          <span class="px-2 py-0.5 text-[10px] bg-slate-800 text-slate-300 rounded-full border border-slate-700">6 Messages</span>
         </div>
         <button onclick="renderEmailList()" class="text-slate-400 hover:text-white text-xs p-1" title="Refresh Inbox">
           <i class="fa-solid fa-rotate-right"></i>
@@ -316,8 +325,8 @@
     </div>
 
     <!-- Email Detail Container -->
-    <div class="flex-1 bg-slate-900/40 flex flex-col overflow-y-auto relative">
-      <div id="email-detail-content" class="h-full flex flex-col">
+    <div id="email-detail-col" class="flex-1 bg-slate-900/40 flex flex-col min-h-0 relative h-full">
+      <div id="email-detail-content" class="h-full flex flex-col min-h-0">
         <!-- Empty state default -->
         <div class="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500">
           <div class="w-16 h-16 rounded-full bg-slate-800/60 flex items-center justify-center mb-4 text-slate-400">
@@ -384,7 +393,7 @@
   </div>
 
   <script>
-    // --- APP STATE & CONFIGURATION ---
+    // --- STREAMING_CHUNK:Initializing application state & email dataset... ---
     const SECURITY_ANSWERS = {
       dog: "ghost",
       singer: "michael jackson",
@@ -395,6 +404,7 @@
       isUnlocked: false,
       selectedEmailId: "email-target",
       masterCode: "k7L4@92#X", // Default escape room vault passcode
+      mobileView: "list" // Mobile view screen toggle state: 'list' or 'detail'
     };
 
     // --- EMAIL DATA STORE ---
@@ -520,32 +530,31 @@
           </div>
         `
       },
-{
-  id: "email-6",
-  sender: "Private Client Services",
-  address: "concierge@fineart-advisors.com",
-  avatar: "V",
-  avatarBg: "bg-slate-700",
-  subject: "Confidential Acquisition Confirmation: Lot 409",
-  date: "Aug 8, 2026",
-  read: true,
-  starred: false,
-  isTarget: true,
-  preview: "We are pleased to formally confirm the successful conclusion of the private bidding process for Lot 409...",
-  body: `
-    <div class="space-y-4 text-slate-300">
-      <p>Dear Mr. Vance,</p>
-      <p>We are pleased to formally confirm the successful conclusion of the private bidding process for <strong>Lot 409: Vincent van Gogh, The Starry Night (1889)</strong>. Your final bid was recorded as the winning entry for this private offering.</p>
-      <p>Our specialized logistics and high-value security team has finalized the transit protocols. Transfer of the artwork to your designated secure facility will be executed within the next seven business days. You will receive a separate encrypted dispatch containing precise delivery windows, courier authentication credentials, and final insurance documentation prior to transit.</p>
-      <p>Please do not hesitate to reach out directly to your dedicated private advisor should you require any immediate accommodations prior to handover.</p>
-      <p>Warmest regards,<br><strong>Private Client Services</strong><br><span class="text-xs text-slate-400">Specialist Department &ndash; European Masters &amp; Modern Art</span></p>
-    </div>
-  `
-}
+      {
+        id: "email-6",
+        sender: "Private Client Services",
+        address: "concierge@fineart-advisors.com",
+        avatar: "V",
+        avatarBg: "bg-slate-700",
+        subject: "Confidential Acquisition Confirmation: Lot 409",
+        date: "Aug 8, 2026",
+        read: true,
+        starred: false,
+        isTarget: false,
+        preview: "We are pleased to formally confirm the successful conclusion of the private bidding process for Lot 409...",
+        body: `
+          <div class="space-y-4 text-slate-300">
+            <p>Dear Mr. Vance,</p>
+            <p>We are pleased to formally confirm the successful conclusion of the private bidding process for <strong>Lot 409: Vincent van Gogh, The Starry Night (1889)</strong>. Your final bid was recorded as the winning entry for this private offering.</p>
+            <p>Our specialized logistics and high-value security team has finalized the transit protocols. Transfer of the artwork to your designated secure facility will be executed within the next seven business days. You will receive a separate encrypted dispatch containing precise delivery windows, courier authentication credentials, and final insurance documentation prior to transit.</p>
+            <p>Please do not hesitate to reach out directly to your dedicated private advisor should you require any immediate accommodations prior to handover.</p>
+            <p>Warmest regards,<br><strong>Private Client Services</strong><br><span class="text-xs text-slate-400">Specialist Department &ndash; European Masters &amp; Modern Art</span></p>
+          </div>
+        `
+      }
     ];
 
     // --- STREAMING_CHUNK:Handling form submission and verification logic... ---
-    // Normalize string for forgiving case & space comparison
     function normalize(str) {
       return (str || "").toLowerCase().trim().replace(/\s+/g, ' ');
     }
@@ -599,11 +608,56 @@
       document.getElementById('security-status-badge').innerText = "DECRYPTED SESSION ACTIVE";
       document.getElementById('security-status-badge').parentElement.classList.replace('text-slate-400', 'text-emerald-400');
       
+      // Update mobile menu button visibility
+      const menuBtn = document.getElementById('mobile-menu-btn');
+      if (menuBtn) menuBtn.classList.remove('hidden');
+
+      state.mobileView = 'list';
       renderEmailList();
-      selectEmail(state.selectedEmailId);
+      selectEmail(state.selectedEmailId, false);
+      updateMobileView();
     }
 
-    // --- STREAMING_CHUNK:Rendering email UI components... ---
+    // --- STREAMING_CHUNK:Managing responsive layout switches for mobile devices... ---
+    function updateMobileView() {
+      const listCol = document.getElementById('email-list-col');
+      const detailCol = document.getElementById('email-detail-col');
+      const sidebar = document.getElementById('inbox-sidebar');
+
+      if (!listCol || !detailCol) return;
+
+      if (window.innerWidth < 768) {
+        if (state.mobileView === 'detail') {
+          listCol.classList.add('hidden');
+          detailCol.classList.remove('hidden');
+          if (sidebar) sidebar.classList.add('hidden');
+        } else {
+          listCol.classList.remove('hidden');
+          detailCol.classList.add('hidden');
+        }
+      } else {
+        // Desktop view: display panels side-by-side
+        listCol.classList.remove('hidden');
+        detailCol.classList.remove('hidden');
+        if (sidebar) sidebar.classList.remove('hidden');
+      }
+    }
+
+    function showMobileList() {
+      state.mobileView = 'list';
+      updateMobileView();
+    }
+
+    function toggleMobileSidebar() {
+      const sidebar = document.getElementById('inbox-sidebar');
+      if (sidebar) {
+        sidebar.classList.toggle('hidden');
+      }
+    }
+
+    window.addEventListener('resize', updateMobileView);
+
+    // --- STREAMING_CHUNK:Rendering email list and details UI components... ---
     // Render the left-hand email list
     function renderEmailList() {
       const listContainer = document.getElementById('email-list-container');
@@ -613,7 +667,7 @@
         const isSelected = email.id === state.selectedEmailId;
         
         const itemHtml = `
-          <div onclick="selectEmail('${email.id}')" 
+          <div onclick="selectEmail('${email.id}', true)" 
             class="p-3.5 cursor-pointer transition-all border-l-2 ${isSelected ? 'bg-brand-500/10 border-brand-500' : 'border-transparent hover:bg-slate-900/60'} flex items-start space-x-3">
             
             <div class="w-9 h-9 rounded-full ${email.avatarBg} flex items-center justify-center font-bold text-white text-xs shrink-0 shadow-sm mt-0.5">
@@ -641,8 +695,12 @@
     }
 
     // Select and render an email detail
-    function selectEmail(id) {
+    function selectEmail(id, openMobileDetail = true) {
       state.selectedEmailId = id;
+      if (openMobileDetail && window.innerWidth < 768) {
+        state.mobileView = 'detail';
+      }
+
       const email = emails.find(e => e.id === id);
       if (!email) return;
 
@@ -652,11 +710,18 @@
       const detailContainer = document.getElementById('email-detail-content');
       detailContainer.innerHTML = `
         <!-- Email Header Bar -->
-        <div class="p-4 sm:p-6 border-b border-slate-800 bg-slate-900/60">
-          <div class="flex items-start justify-between gap-4 mb-3">
-            <h2 class="text-lg sm:text-xl font-bold text-white tracking-tight">
-              ${email.subject}
-            </h2>
+        <div class="p-4 sm:p-6 border-b border-slate-800 bg-slate-900/60 shrink-0">
+          <div class="flex items-center justify-between gap-3 mb-3">
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <!-- Mobile Back to Inbox Button -->
+              <button onclick="showMobileList()" class="md:hidden p-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-brand-400 rounded-lg border border-slate-700 flex items-center space-x-1 shrink-0 font-semibold active:scale-95 transition-transform" title="Back to Inbox">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span class="text-[11px]">Inbox</span>
+              </button>
+              <h2 class="text-base sm:text-xl font-bold text-white tracking-tight truncate">
+                ${email.subject}
+              </h2>
+            </div>
             <div class="flex items-center space-x-2 shrink-0">
               <button onclick="copyCurrentCode()" class="p-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-colors flex items-center space-x-1" title="Copy Content">
                 <i class="fa-regular fa-copy"></i>
@@ -667,20 +732,20 @@
 
           <!-- Sender metadata -->
           <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-full ${email.avatarBg} flex items-center justify-center font-bold text-white text-sm">
+            <div class="w-10 h-10 rounded-full ${email.avatarBg} flex items-center justify-center font-bold text-white text-sm shrink-0">
               ${email.avatar}
             </div>
             <div class="flex-1 min-w-0">
-              <div class="text-xs font-bold text-slate-200">${email.sender}</div>
-              <div class="text-[11px] text-slate-400 font-mono">${email.address}</div>
+              <div class="text-xs font-bold text-slate-200 truncate">${email.sender}</div>
+              <div class="text-[11px] text-slate-400 font-mono truncate">${email.address}</div>
             </div>
-            <div class="text-right text-xs text-slate-500 font-mono">
+            <div class="text-right text-xs text-slate-500 font-mono shrink-0">
               ${email.date}
             </div>
           </div>
         </div>
 
-        <!-- Email Body Content -->
+        <!-- Email Body Content (Vertically Scrollable) -->
         <div class="p-4 sm:p-8 flex-1 overflow-y-auto leading-relaxed text-sm">
           ${email.body}
         </div>
@@ -693,6 +758,8 @@
           codeElement.innerText = state.masterCode;
         }
       }
+
+      updateMobileView();
     }
 
     // Copy passcode helper
@@ -726,7 +793,7 @@
         // update email data
         const targetEmail = emails.find(e => e.isTarget);
         if (targetEmail) {
-          selectEmail(targetEmail.id);
+          selectEmail(targetEmail.id, false);
         }
         alert("Target Code Updated to: " + newCode);
       }
@@ -745,6 +812,10 @@
       document.getElementById('security-screen').classList.remove('hidden');
       document.getElementById('security-status-badge').innerText = "TLS 1.3 • Zero-Knowledge Encrypted";
       document.getElementById('security-status-badge').parentElement.classList.replace('text-emerald-400', 'text-slate-400');
+      
+      const menuBtn = document.getElementById('mobile-menu-btn');
+      if (menuBtn) menuBtn.classList.add('hidden');
+
       toggleHostPanel();
     }
   </script>
